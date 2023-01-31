@@ -1,4 +1,4 @@
-use clap::{value_parser, Arg, Command};
+use argh::FromArgs;
 use std::{
     fs::File,
     io::{Read, Write},
@@ -43,51 +43,56 @@ fn hexdump(data: &[u8], line_width: usize) {
     }
 }
 
-fn main() {
-    let matches = Command::new(env!("CARGO_BIN_NAME"))
-        .about("A CLI utility to read and write hexadecimal value to a file")
-        .arg_required_else_help(true)
-        .arg(
-            Arg::new("write")
-                .short('w')
-                .long("write")
-                .help("Quoted bytes to write in hexadecimal format without 0x (e.g.: \"1f 8b 08\")")
-                .required_unless_present("read"),
-        )
-        .arg(
-            Arg::new("delay")
-                .short('d')
-                .long("delay")
-                .value_parser(value_parser!(u8))
-                .help("Delay bwtween write and read operation in seconds")
-                .default_value("0"),
-        )
-        .arg(
-            Arg::new("read")
-                .short('r')
-                .long("read")
-                .value_parser(value_parser!(usize))
-                .help("How many bytes to read after write operation")
-                .required_unless_present("write"),
-        )
-        .arg(Arg::new("file").help("file to read/write").required(true))
-        .get_matches();
+#[derive(FromArgs)]
+#[argh(description = "A CLI utility to read and write hexadecimal value to a file")]
+struct Args {
+    #[argh(
+        option,
+        short = 'w',
+        description = "quoted bytes to write in hexadecimal format without 0x (e.g.: \"1f 8b 08\")"
+    )]
+    write: Option<String>,
 
-    let path = matches.get_one::<String>("file").unwrap();
+    #[argh(
+        option,
+        short = 'r',
+        description = "how many bytes to read after write operation"
+    )]
+    read: Option<usize>,
+
+    #[argh(
+        option,
+        short = 'd',
+        description = "delay bwtween write and read operation in seconds"
+    )]
+    delay: Option<u8>,
+
+    #[argh(positional, description = "file to read/write")]
+    file: String,
+}
+
+fn main() {
+    let args: Args = argh::from_env();
+
+    if args.write.is_none() && args.read.is_none() {
+        eprintln!("At least one of --write and --read must be present");
+        return;
+    }
+
     let mut file = match File::options()
         .create(true)
         .write(true)
         .read(true)
-        .open(path)
+        .open(&args.file)
     {
         Ok(file) => file,
         Err(err) => {
-            eprintln!("Failed to open file {path}: {err}");
+            eprintln!("Failed to open file {}: {err}", &args.file);
             return;
         }
     };
 
-    if let Some(write) = matches.get_one::<String>("write") {
+    if let Some(write) = args.write {
         let bytes = write.trim().to_lowercase();
 
         let mut data = Vec::new();
@@ -101,28 +106,29 @@ fn main() {
         });
 
         if let Err(err) = file.write_all(&data) {
-            eprintln!("Failed to write file {path}: {err}");
+            eprintln!("Failed to write file {}: {err}", &args.file);
         }
     }
 
-    let delay = matches.get_one::<u8>("delay").unwrap();
-    sleep(Duration::from_secs(*delay as u64));
+    if let Some(delay) = args.delay {
+        sleep(Duration::from_secs(delay as u64));
+    }
 
-    if let Some(len) = matches.get_one::<usize>("read") {
-        let len = *len;
+    if let Some(len) = args.read {
         let mut data = vec![0; len];
         match file.read(&mut data) {
             Ok(read) => {
                 if read != len {
                     eprintln!(
-                        "Error in reading file {path}: expecting {len} bytes, read back {read} bytes"
+                        "Error in reading file {}: expecting {len} bytes, read back {read} bytes",
+                        &args.file
                     );
                 } else {
                     hexdump(&data, 16);
                 }
             }
             Err(err) => {
-                eprintln!("Failed to read file {path}: {err}");
+                eprintln!("Failed to read file {}: {err}", &args.file);
             }
         }
     }
