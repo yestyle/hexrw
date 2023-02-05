@@ -1,7 +1,16 @@
 [package]
 name = "hexrw"
 version = "0.1.0"
+description = "A CLI utility to read / write hexadecimal value from / to a file"
+authors = ["Philip Ye <yestyle@gmail.com>"]
 edition = "2021"
+license-file = "LICENSE"
+categories = ["command-line-utilities"]
+keywords = ["hex", "hexadecimal"]
+repository = "https://github.com/yestyle/hexrw"
+homepage = "https://github.com/yestyle/hexrw"
+documentation = "https://github.com/yestyle/hexrw"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
